@@ -37,7 +37,7 @@ namespace gazebo
 
 
       /// Parameters
-      std::string node_namespace_;
+      std::string robotNamespaceP_;
       std::string left_wheel_joint_name_;
       std::string right_wheel_joint_name_;
       std::string front_castor_joint_name_;

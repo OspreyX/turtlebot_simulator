@@ -58,9 +58,9 @@ void GazeboRosCreate::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
   }
 
 
-  this->node_namespace_ = "";
-  if (_sdf->HasElement("node_namespace"))
-    this->node_namespace_ = _sdf->GetElement("node_namespace")->GetValueString() + "/";
+  this->robotNamespaceP_ = "";
+  if (_sdf->HasElement("robotNamespace"))
+    this->robotNamespaceP_ = _sdf->GetElement("robotNamespace")->GetValueString() + "/";
 
 
   left_wheel_joint_name_ = "left_wheel_joint";
@@ -150,21 +150,20 @@ void GazeboRosCreate::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
     ros::init(argc, argv, "gazebo_turtlebot", ros::init_options::NoSigintHandler|ros::init_options::AnonymousName);
   }
 
-  rosnode_ = new ros::NodeHandle( node_namespace_ );
+  rosnode_ = new ros::NodeHandle( robotNamespaceP_ );
 
+  groundTruthP_ = "pose";
   if (_sdf->HasElement("ground_truth_topic"))
     groundTruthP_ = _sdf->GetElement("ground_truth_topic")->GetValueString();
-  else
-    groundTruthP_ = "pose";
 
-  if (!_sdf->HasElement("ground_truth_time"))
+  groundTruthTimeP_ = 5.0;
+  if (_sdf->HasElement("ground_truth_time"))
     groundTruthTimeP_ = _sdf->GetElement("ground_truth_time")->GetValueDouble();
-  else
-    groundTruthTimeP_ = 5.0;
 
   tf_prefix_ = tf::getPrefixParam(*rosnode_);
 
   cmd_vel_sub_ = rosnode_->subscribe("cmd_vel", 1, &GazeboRosCreate::OnCmdVel, this );
+  ground_truth_sub_ = rosnode_->subscribe(groundTruthP_, 1, &GazeboRosCreate::OnGroundTruth, this );
 
   sensor_state_pub_ = rosnode_->advertise<turtlebot_node::TurtlebotSensorState>("sensor_state", 1);
   odom_pub_ = rosnode_->advertise<nav_msgs::Odometry>("odom", 1);
