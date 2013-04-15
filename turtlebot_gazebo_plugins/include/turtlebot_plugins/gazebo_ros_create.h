@@ -87,6 +87,7 @@ namespace gazebo
       sensors::RaySensorPtr wall_sensor_;
 
       tf::TransformBroadcaster transform_broadcaster_;
+      std::string tf_prefix_;
       sensor_msgs::JointState js_;
 
       turtlebot_node::TurtlebotSensorState sensor_state_;

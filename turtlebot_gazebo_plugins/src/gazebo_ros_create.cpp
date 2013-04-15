@@ -9,6 +9,8 @@
 
 #include <turtlebot_plugins/gazebo_ros_create.h>
 
+#include <tf/transform_listener.h>
+
 #include <ros/time.h>
 
 using namespace gazebo;
@@ -147,13 +149,14 @@ void GazeboRosCreate::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
   }
 
   rosnode_ = new ros::NodeHandle( node_namespace_ );
+  tf_prefix_ = tf::getPrefixParam(*rosnode_);
 
-  cmd_vel_sub_ = rosnode_->subscribe("/cmd_vel", 1, &GazeboRosCreate::OnCmdVel, this );
+  cmd_vel_sub_ = rosnode_->subscribe("cmd_vel", 1, &GazeboRosCreate::OnCmdVel, this );
 
   sensor_state_pub_ = rosnode_->advertise<turtlebot_node::TurtlebotSensorState>("sensor_state", 1);
-  odom_pub_ = rosnode_->advertise<nav_msgs::Odometry>("/odom", 1);
+  odom_pub_ = rosnode_->advertise<nav_msgs::Odometry>("odom", 1);
 
-  joint_state_pub_ = rosnode_->advertise<sensor_msgs::JointState>("/joint_states", 1);
+  joint_state_pub_ = rosnode_->advertise<sensor_msgs::JointState>("joint_states", 1);
 
   js_.name.push_back( left_wheel_joint_name_ );
   js_.position.push_back(0);
@@ -283,8 +286,8 @@ void GazeboRosCreate::UpdateChild()
   nav_msgs::Odometry odom;
   odom.header.stamp.sec = time_now.sec;
   odom.header.stamp.nsec = time_now.nsec;
-  odom.header.frame_id = "odom";
-  odom.child_frame_id = "base_footprint";
+  odom.header.frame_id = tf::resolve(tf_prefix_, "odom");
+  odom.child_frame_id = tf::resolve(tf_prefix_, "base_footprint");
   odom.pose.pose.position.x = odom_pose_[0];
   odom.pose.pose.position.y = odom_pose_[1];
   odom.pose.pose.position.z = 0;
