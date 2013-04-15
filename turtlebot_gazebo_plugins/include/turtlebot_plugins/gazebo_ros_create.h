@@ -100,6 +100,8 @@ namespace gazebo
       turtlebot_node::TurtlebotSensorState sensor_state_;
 
       void spin();
+      // If we want to leave the simulation prematurely
+      bool kill_sim;
       boost::thread *spinner_thread_;
 
       event::ConnectionPtr contact_event_;

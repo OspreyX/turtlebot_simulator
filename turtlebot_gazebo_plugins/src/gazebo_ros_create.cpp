@@ -33,10 +33,12 @@ GazeboRosCreate::GazeboRosCreate()
   joints_[1].reset();
   joints_[2].reset();
   joints_[3].reset();
+  kill_sim = false;
 }
 
 GazeboRosCreate::~GazeboRosCreate()
 {
+  kill_sim = true;
   rosnode_->shutdown();
   this->spinner_thread_->join();
   delete this->spinner_thread_;
@@ -435,7 +437,7 @@ void GazeboRosCreate::OnGroundTruth( const geometry_msgs::PoseConstPtr &msg)
 
 void GazeboRosCreate::spin()
 {
-  while(ros::ok()) ros::spinOnce();
+  while(ros::ok() && !kill_sim) ros::spinOnce();
 }
 
 GZ_REGISTER_MODEL_PLUGIN(GazeboRosCreate);
