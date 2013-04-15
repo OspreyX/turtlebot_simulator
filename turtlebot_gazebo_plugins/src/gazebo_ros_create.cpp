@@ -149,6 +149,17 @@ void GazeboRosCreate::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
   }
 
   rosnode_ = new ros::NodeHandle( node_namespace_ );
+
+  if (_sdf->HasElement("ground_truth_topic"))
+    groundTruthP_ = _sdf->GetElement("ground_truth_topic")->GetValueString();
+  else
+    groundTruthP_ = "pose";
+
+  if (!_sdf->HasElement("ground_truth_time"))
+    groundTruthTimeP_ = _sdf->GetElement("ground_truth_time")->GetValueDouble();
+  else
+    groundTruthTimeP_ = 5.0;
+
   tf_prefix_ = tf::getPrefixParam(*rosnode_);
 
   cmd_vel_sub_ = rosnode_->subscribe("cmd_vel", 1, &GazeboRosCreate::OnCmdVel, this );
@@ -320,6 +331,19 @@ void GazeboRosCreate::UpdateChild()
 
   odom_pub_.publish( odom ); 
 
+  // Check for existence of ground truth corrections
+  if (time_now - last_ground_truth_ > (groundTruthTimeP_)) {
+      // Corrections late
+      // Work out and broadcast transform
+      btVector3 vt(odom_pose_[0], odom_pose_[1],0);
+      tf::Transform base_link_to_odom(qt,vt);
+      transform_broadcaster_.sendTransform(tf::StampedTransform(base_link_to_odom,
+                                                                 odom.header.stamp,
+                                                                 odom.header.frame_id,
+                                                                 odom.child_frame_id));
+  }
+
+
   js_.header.stamp.sec = time_now.sec;
   js_.header.stamp.nsec = time_now.nsec;
   if (this->set_joints_[LEFT])
@@ -402,6 +426,11 @@ void GazeboRosCreate::OnCmdVel( const geometry_msgs::TwistConstPtr &msg)
 
   wheel_speed_[LEFT] = vr - va * (wheel_sep_) / 2;
   wheel_speed_[RIGHT] = vr + va * (wheel_sep_) / 2;
+}
+
+void GazeboRosCreate::OnGroundTruth( const geometry_msgs::PoseConstPtr &msg)
+{
+  last_ground_truth_ = this->my_world_->GetSimTime();
 }
 
 void GazeboRosCreate::spin()

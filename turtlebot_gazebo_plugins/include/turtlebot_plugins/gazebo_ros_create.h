@@ -33,6 +33,7 @@ namespace gazebo
       void UpdateSensors();
       void OnContact(const std::string &name, const physics::Contact &contact);
       void OnCmdVel( const geometry_msgs::TwistConstPtr &msg);
+      void OnGroundTruth( const geometry_msgs::PoseConstPtr &msg);
 
 
       /// Parameters
@@ -62,6 +63,12 @@ namespace gazebo
       ros::Publisher joint_state_pub_;
   
       ros::Subscriber cmd_vel_sub_;
+
+      ///Listen for ground truth data
+      ros::Subscriber ground_truth_sub_;
+      std::string groundTruthP_;
+      double groundTruthTimeP_;
+      common::Time last_ground_truth_;
 
       physics::WorldPtr my_world_;
       physics::ModelPtr my_parent_;
