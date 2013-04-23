@@ -38,6 +38,8 @@ GazeboRosCreate::GazeboRosCreate()
 
 GazeboRosCreate::~GazeboRosCreate()
 {
+  event::Events::DisconnectWorldUpdateStart(this->updateConnection);
+  base_geom_->DisconnectContact(contact_event_);
   kill_sim = true;
   rosnode_->shutdown();
   this->spinner_thread_->join();
