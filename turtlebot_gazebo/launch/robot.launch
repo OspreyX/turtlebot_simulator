@@ -1,54 +1,99 @@
+<?xml version="1.0"?>
+<!--
+Copyright (c) 2012, Willow Garage/Clearpath Robotics
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Willow Garage or Clearpath Robotics nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL WILLOW GARAGE OR CLEARPATH ROBOTICS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+This program contains the launch file for simulating one of a group of TurtleBots in Gazebo
+-->
 <launch>
-  <param name="robot_description" command="$(find xacro)/xacro.py '$(find turtlebot_description)/urdf/turtlebot.urdf.xacro'" />
+  <arg name="robot_id" default="$(optenv ROBOT_ID turtlebot_X)" />
+  <group ns="$(arg robot_id)">
+      <!-- For reference against common frame -->
+      <node pkg="tf" type="static_transform_publisher" name="base_ref" args="0 0 0 0 0 0 /odom /$(arg robot_id)/odom 100" /> 
 
-  <node name="spawn_turtlebot_model" pkg="gazebo" type="spawn_model" args="$(optenv ROBOT_INITIAL_POSE) -unpause -urdf -param robot_description -model turtlebot" respawn="false" output="screen"/>
+      <!-- Spawn robot model, state publisher, diagnostics -->
+      <param name="robot_description" command="$(find xacro)/xacro.py '$(find turtlebot_description)/urdf/turtlebot.urdf.xacro'" />
 
-  <node pkg="diagnostic_aggregator" type="aggregator_node" name="diagnostic_aggregator" >
-    <rosparam command="load" file="$(find turtlebot_bringup)/config/diagnostics.yaml" />
-  </node>
-  
-  <node pkg="robot_state_publisher" type="state_publisher" name="robot_state_publisher" output="screen">
-    <param name="publish_frequency" type="double" value="30.0" />
-  </node>
+      <node name="spawn_turtlebot_model" pkg="gazebo" type="spawn_model" args="$(optenv ROBOT_INITIAL_POSE) -unpause -urdf -param robot_description -robot_namespace $(arg robot_id) -model $(arg robot_id)" respawn="false" output="screen"/>
 
+      <node pkg="diagnostic_aggregator" type="aggregator_node" name="diagnostic_aggregator" >
+        <rosparam command="load" file="$(find turtlebot_bringup)/config/diagnostics.yaml" />
+      </node>
 
-  <!-- The odometry estimator -->
+      <node pkg="robot_state_publisher" type="state_publisher" name="robot_state_publisher" output="screen">
+        <param name="publish_frequency" type="double" value="30.0" />
+        <param name="tf_prefix" value="$(arg robot_id)" type="str"/>
+      </node>
 
-  <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
-    <param name="freq" value="30.0"/>
-    <param name="sensor_timeout" value="1.0"/>
-    <param name="publish_tf" value="true"/>
-    <param name="odom_used" value="true"/>
-    <param name="imu_used" value="false"/>
-    <param name="vo_used" value="false"/>
-  </node>
+      <!-- Allows for rviz-based teleoperation -->
+      <node pkg="turtlebot_interactive_markers" name="interactive_markers" type="turtlebot_marker_server">
+        <param name="link_name" value="$(arg robot_id)/base_link"/>
+        <remap from="/cmd_vel" to="cmd_vel"/>
+      </node>
+      
+      <!-- The odometry estimator -->
+      <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+        <param name="freq" value="30.0"/>
+        <param name="sensor_timeout" value="1.0"/>
+        <param name="publish_tf" value="true"/>
+        <param name="odom_used" value="true"/>
+        <param name="imu_used" value="false"/>
+        <param name="vo_used" value="false"/>
+        <param name="output_frame" value="odom"/>
+        <param name="tf_prefix" value="$(arg robot_id)" type="str"/>
+      </node>
 
+      <!-- Nodelet manager for simulated LIDAR/Kinect -->
+      <node pkg="nodelet" type="nodelet" name="openni_manager" output="screen" respawn="true" args="manager"/>
 
-  <!-- throttling -->
-  <node pkg="nodelet" type="nodelet" name="pointcloud_throttle" args="load pointcloud_to_laserscan/CloudThrottle openni_manager" respawn="true">
-    <param name="max_rate" value="20.0"/>
-    <remap from="cloud_in" to="/camera/depth/points"/>
-    <remap from="cloud_out" to="cloud_throttled"/>
-  </node>
+      <!-- Throttling simulated cloud -->
+      <node pkg="nodelet" type="nodelet" name="pointcloud_throttle" args="load pointcloud_to_laserscan/CloudThrottle openni_manager" respawn="true">
+        <param name="max_rate" value="20.0"/>
+        <remap from="cloud_in" to="camera/depth/points"/>
+        <remap from="cloud_out" to="cloud_throttled"/>
+        <param name="tf_prefix" value="$(arg robot_id)" type="str"/>
+      </node>
 
-  <!-- Fake Laser -->
-  <node pkg="nodelet" type="nodelet" name="kinect_laser" args="load pointcloud_to_laserscan/CloudToScan openni_manager" respawn="true">
-    <param name="output_frame_id" value="/camera_depth_frame"/>
-    <!-- heights are in the (optical?) frame of the kinect -->
-    <param name="min_height" value="-0.15"/>
-    <param name="max_height" value="0.15"/>
-    <remap from="cloud" to="/cloud_throttled"/>
-  </node>
+      <!-- Fake Laser -->
+      <node pkg="nodelet" type="nodelet" name="kinect_laser" args="load pointcloud_to_laserscan/CloudToScan openni_manager" respawn="true">
+        <param name="output_frame_id" value="$(arg robot_id)/kinect_depth_frame"/>
+        <!-- heights are in the (optical?) frame of the kinect -->
+        <param name="min_height" value="-0.15"/>
+        <param name="max_height" value="0.15"/>
+        <remap from="cloud" to="cloud_throttled"/>
+      </node>
 
-  <!-- Fake Laser (narrow one, for localization -->
-  <node pkg="nodelet" type="nodelet" name="kinect_laser_narrow" args="load pointcloud_to_laserscan/CloudToScan openni_manager" respawn="true">
-    <param name="output_frame_id" value="/camera_depth_frame"/>
-    <!-- heights are in the (optical?) frame of the kinect -->
-    <param name="min_height" value="-0.025"/>
-    <param name="max_height" value="0.025"/>
-    <remap from="cloud" to="/cloud_throttled"/>
-    <remap from="scan" to="/narrow_scan"/>
-  </node>
-
+      <!-- Fake Laser (narrow one, for localization -->
+      <node pkg="nodelet" type="nodelet" name="kinect_laser_narrow" args="load pointcloud_to_laserscan/CloudToScan openni_manager" respawn="true">
+        <param name="output_frame_id" value="$(arg robot_id)/kinect_depth_frame"/>
+        <!-- heights are in the (optical?) frame of the kinect -->
+        <param name="min_height" value="-0.025"/>
+        <param name="max_height" value="0.025"/>
+        <remap from="cloud" to="cloud_throttled"/>
+        <remap from="scan" to="narrow_scan"/>
+      </node>
+  </group>
 
 </launch>
